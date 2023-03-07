@@ -1,0 +1,204 @@
+/**
+    排行榜对话框
+*/
+
+import lib/windows/BaseDialog
+
+import resource
+
+class RankRecord
+{
+    var _name;
+    var _score;
+}
+
+class RankDlg extends BaseDialog
+{
+    var _parent;
+    var _memDC = null;
+    var _memDcBitmap = null;
+
+    var _font = new Font(250,"楷体_GB2312");
+
+    var _rankData = [];
+
+    function RankDlg(parent)
+    {
+        super(parent);
+
+        _parent = parent;
+        var rect = parent.getWindowRect();
+        var width = rect.right - rect.left;
+        var height = rect.bottom - rect.top;
+        var bx = width / 2 - GameRes::_rankBack.m_Width + rect.left;
+        var by = (height - GameRes::_rankBack.m_Height) / 2 + rect.top;
+        openPaint();
+        createWindow("RankDlg", WS_POPUP | WS_BORDER | WS_CLIPSIBLINGS, 
+        bx,by,GameRes::_rankBack.m_Width,GameRes::_rankBack.m_Height,parent.m_hWnd);
+        loadRankData();
+    }
+
+    virtual function onCreate()
+    {
+        this.createButton("确定",300,255,100,30,GAME_BUTTON_RANK);
+    }
+
+    function refRank()
+    {
+        var insertIdx = -1;
+        for (var i = _rankData.size() - 1; i >= 0 ; i--)
+        {
+            if (g_user._score > _rankData[i]._score)
+            {
+                insertIdx = i;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        var res = false;
+        if (insertIdx != -1)
+        {
+            var record = new RankRecord();
+            record._name = g_user._name;
+            record._score = g_user._score;
+            _rankData.insert(insertIdx,record);
+            res = true;
+        }
+        else if (_rankData.size() < 3)
+        {
+            var record = new RankRecord();
+            record._name = g_user._name;
+            record._score = g_user._score;
+            _rankData.add(record);
+            
+            res = true;
+        }
+
+        if (res)
+        {
+            if (_rankData.size() > 3)
+            {
+                _rankData.remove(3);
+            }            
+            saveRankData();
+        }
+
+        return res;
+    }
+
+    function doModal()
+    {
+        var rect = _parent.getWindowRect();
+        var seldRect = getWindowRect();
+        var bx = ((rect.right - rect.left) - (seldRect.right - seldRect.left)) / 2 + rect.left;
+        var by = ((rect.bottom - rect.top) - (seldRect.bottom - seldRect.top)) / 2 + rect.top;
+        setPosition(bx,by);
+
+        super.doModal();
+    }
+
+    virtual function onPaint(dc)
+    {
+        if (_memDC == null)
+        {
+            _memDC = new CDC();
+            _memDC.createCompatibleDC(dc);
+
+            _memDcBitmap = new Bitmap();
+            _memDcBitmap.createCompatibleBitmap(dc,GameRes::_rankBack.m_Width,GameRes::_rankBack.m_Height);
+            _memDC.selectBitmap(_memDcBitmap);
+        }
+
+        var cdc = _memDC;
+
+        GameRes::_rankBack.show(cdc,0,0,GameRes::_rankBack.m_Width,GameRes::_rankBack.m_Height);
+
+        cdc.selectFont(_font);            
+        cdc.setBkColor(RGB(119,109,252));
+        cdc.setTextColor(RGB(255,249,21));
+
+        foreach (k,v : _rankData)
+        {
+            cdc.textOut(100,120 + 40 * k,sprintf("%d   %s    %d",k + 1,v._name,v._score));
+        }
+
+        for (var i = _rankData.size() ; i < 3 ; i++)
+        {
+            cdc.textOut(100,120 + 40 * i,sprintf("%d   ------    ---",i + 1));
+        }
+
+        dc.bitBlt(0,0,GameRes::_rankBack.m_Width,GameRes::_rankBack.m_Height,cdc,0,0,SRCCOPY);
+    }
+
+    virtual function onCommand(cmdid)
+    {
+        switch (cmdid)
+        {
+            case GAME_BUTTON_RANK:
+            {
+                undoModal();
+                break;
+            }
+            default:
+            {
+                break;
+            }
+        }
+    }
+
+    function saveRankData()
+    {
+        if (_rankData.size() <= 0)
+        {
+            return;            
+        }
+
+        var path = GetRoot() + "rank.dat";
+        var file = new File(path,"wb");
+        if (!file.exists())
+        {            
+            return;
+        }
+
+        var bytes = new ByteArray();
+        bytes.writeInt(_rankData.size());
+
+        foreach (k,v : _rankData)
+        {
+            bytes.writeString(v._name);
+            bytes.writeInt(v._score);
+        }
+
+        file.writeBytes(bytes,bytes.getWritePos());
+        file.close();
+    }
+
+    function loadRankData()
+    {
+        var path = GetRoot() + "rank.dat";
+        var file = new File(path,"rb");
+        if (!file.exists())
+        {            
+            return;
+        }
+
+        _rankData.clear();
+
+        var bytes = new ByteArray(file.size());
+        file.readBytes(bytes,file.size());
+
+        var cnt = bytes.readInt();
+        for (var i = 0; i < cnt ; i++)
+        {
+            var record = new RankRecord();
+            record._name = bytes.readString();
+            record._score = bytes.readInt();
+            _rankData.add(record);
+        }
+
+        file.close();
+    }
+}

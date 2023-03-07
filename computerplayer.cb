@@ -1,0 +1,361 @@
+/**
+    电脑控制的角色类型定义
+*/
+
+import gamedata
+
+module GameData
+{
+    class ComputerPlayer extends GameData::Player
+    {
+        var _pokerCombination = new Array();
+        var _findOrder = [GameData::SZ,GameData::ZMD,GameData::SD,GameData::DZ,GameData::DP,GameData::ZD];    //出牌顺序
+
+        function ComputerPlayer(name,idx)
+        {
+            super(name,idx);
+        }
+
+        virtual function clear()
+        {
+            super.clear();
+            _pokerCombination.clear();
+        }
+
+        virtual function sort()
+        {
+            super.sort();
+
+            var pokerCopy = new Array();
+            for (var i = 0; i < _poker.size() ; i++)
+            {
+                pokerCopy.add(_poker[i]);
+            }
+
+            var removeIdx = new Array();
+            var arrayDZ = [];   //记录当前对子
+            var arraySD = [];   //记录当前三带
+
+            //先判断炸弹类型
+            for (var i = 0; i < pokerCopy.size() - 3 ; i++)
+            {
+                if (pokerCopy[i]._figure == pokerCopy[i + 1]._figure && 
+                pokerCopy[i + 1]._figure == pokerCopy[i + 2]._figure && 
+                pokerCopy[i + 2]._figure == pokerCopy[i + 3]._figure)
+                {
+                    var pokerCombination = new GameData::PokerCombination(
+                        GameData::ZD,pokerCopy[i]._figure,
+                        [pokerCopy[i],pokerCopy[i + 1],pokerCopy[i + 2],pokerCopy[i + 3]]);
+                    _pokerCombination.add(pokerCombination);                
+                    
+                    removeIdx.add(i);
+                    removeIdx.add(i + 1);
+                    removeIdx.add(i + 2);
+                    removeIdx.add(i + 3);
+                    i += 3;
+                    continue;
+                }
+            }
+
+            for (var i = removeIdx.size() - 1; i >= 0 ; i--)
+            {
+                pokerCopy.remove(removeIdx[i]);
+            }
+            removeIdx.clear();
+
+            //判断3张一样的,先放入类型数组，后面再放入要带的2张牌
+            for (var i = 0; i < pokerCopy.size() - 3 ; i++)
+            {
+                if (pokerCopy[i]._figure == pokerCopy[i + 1]._figure && 
+                pokerCopy[i + 1]._figure == pokerCopy[i + 2]._figure)
+                {
+                    var pokerCombination = new GameData::PokerCombination(
+                        GameData::SD,pokerCopy[i]._figure,[pokerCopy[i],pokerCopy[i + 1],pokerCopy[i + 2]]);
+                    
+                    removeIdx.add(i);
+                    removeIdx.add(i + 1);
+                    removeIdx.add(i + 2);
+                    arraySD.add(pokerCombination);
+                    i += 2;
+                    continue;
+                }
+            }
+
+            for (var i = removeIdx.size() - 1; i >= 0 ; i--)
+            {
+                pokerCopy.remove(removeIdx[i]);
+            }
+            removeIdx.clear();
+
+            //判断对子
+            for (var i = 0; i < pokerCopy.size() - 1 ; i++)
+            {
+                if (pokerCopy[i]._figure == pokerCopy[i + 1]._figure)
+                {
+                    var pokerCombination = new GameData::PokerCombination(
+                        GameData::DZ,pokerCopy[i]._figure,[pokerCopy[i],pokerCopy[i + 1]]);
+                    
+                    removeIdx.add(i);
+                    removeIdx.add(i + 1);
+                    arrayDZ.add(pokerCombination);
+                    i++;
+                    continue;
+                }
+            }
+
+            for (var i = removeIdx.size() - 1; i >= 0 ; i--)
+            {
+                pokerCopy.remove(removeIdx[i]);
+            }
+            removeIdx.clear();
+
+            //判断顺子
+            for (var i = 0; i < pokerCopy.size() - 4 ; i++)
+            {
+                if (pokerCopy[i]._figure < 10 && pokerCopy[i]._figure + 1 == pokerCopy[i + 1]._figure && 
+                pokerCopy[i + 1]._figure + 1 == pokerCopy[i + 2]._figure && 
+                pokerCopy[i + 2]._figure + 1 == pokerCopy[i + 3]._figure &&
+                pokerCopy[i + 3]._figure + 1 == pokerCopy[i + 4]._figure)
+                {
+                    //单顺成立，继续向后判断
+
+                    removeIdx.add(i);
+                    removeIdx.add(i + 1);
+                    removeIdx.add(i + 2);
+                    removeIdx.add(i + 3);
+                    removeIdx.add(i + 4);
+
+                    var pokerArr = [pokerCopy[i],pokerCopy[i + 1],pokerCopy[i + 2],pokerCopy[i + 3],pokerCopy[i + 4]];
+                    
+                    for (var j = i + 4; j < pokerCopy.size() - 1 ; j++)
+                    {
+                        if (pokerCopy[j]._figure >= 13 || pokerCopy[j]._figure + 1 != pokerCopy[j + 1]._figure)
+                        {
+                            break;                            
+                        }
+
+                        pokerArr.add(pokerCopy[j + 1]);
+                        removeIdx.add(j + 1);
+                    }
+
+                    var pokerCombination = new GameData::PokerCombination(GameData::SZ,pokerCopy[i]._figure,pokerArr);
+                    _pokerCombination.add(pokerCombination);
+                    i += removeIdx.size() - 1;
+                    continue;
+                }
+            }
+
+            for (var i = removeIdx.size() - 1; i >= 0 ; i--)
+            {
+                pokerCopy.remove(removeIdx[i]);
+            }
+            removeIdx.clear();
+
+            //pokerCopy剩下的牌是单牌,最后再处理
+
+            //开始判断姊妹对情况
+            for (var k = 0; k < 2 ; k++)    //一副牌中最多2个姊妹对
+            {
+                for (var i = 0; i < arrayDZ.size() - 2 ; i++)
+                {
+                    if (arrayDZ[i]._figure < 12 && arrayDZ[i]._figure + 1 == arrayDZ[i + 1]._figure &&
+                    arrayDZ[i + 1]._figure + 1 == arrayDZ[i + 2]._figure)
+                    {
+                        //姊妹对成立 继续往后找
+                        removeIdx.add(i + 1);
+                        removeIdx.add(i + 2);
+
+                        for (var j = i + 2; j < arrayDZ.size() - 1 ; j++)
+                        {
+                            if (arrayDZ[j]._figure < 13 && arrayDZ[j]._figure + 1 == arrayDZ[j + 1]._figure)
+                            {
+                                removeIdx.add(j + 1);
+                                continue;
+                            }
+                            break;
+                        }
+
+                        var mergePokerCombination = arrayDZ[i];
+                        mergePokerCombination._type = GameData::ZMD;                        
+
+                        for (var j = 0; j < removeIdx.size() ; j++)
+                        {
+                            var srcPokerCombination = arrayDZ[removeIdx[j]];
+                            foreach (k,v : srcPokerCombination._pokerArray)
+                            {
+                                mergePokerCombination._pokerArray.add(v);
+                            }                                                                                    
+                        }
+
+                        _pokerCombination.add(mergePokerCombination);
+
+                        for (var j = removeIdx.size() - 1; j >= 0 ; j--)
+                        {
+                            arrayDZ.remove(removeIdx[j]);
+                        }
+                        arrayDZ.remove(i);
+                        removeIdx.clear();
+                        break;
+                    }                
+                }
+            }
+
+            //三带带牌处理
+            for (var k = arraySD.size() - 1; k >= 0 ; k--)
+            {
+                if (pokerCopy.size() > 1)
+                {
+                    arraySD[k]._pokerArray.add(pokerCopy[0]);
+                    arraySD[k]._pokerArray.add(pokerCopy[1]);
+                    pokerCopy.remove(1);
+                    pokerCopy.remove(0);
+                    continue;
+                }
+
+                if (arrayDZ.size() > 0)
+                {
+                    arraySD[k]._pokerArray.add(arrayDZ[0]._pokerArray[0]);
+                    arraySD[k]._pokerArray.add(arrayDZ[0]._pokerArray[1]);
+                    arrayDZ.remove(0);
+                    continue;
+                }
+
+                //无牌可带，最小的拆成对子和单牌
+                pokerCopy.add(arraySD[0]._pokerArray[2]);
+                arraySD[0]._pokerArray.remove(2);
+                arraySD[0]._type = DZ;
+                arrayDZ.add(arraySD[0]);
+                arraySD.remove(0);
+            }
+
+            foreach (k,v : arraySD)
+            {
+                _pokerCombination.add(v);
+            }
+
+            foreach (k,v : arrayDZ)
+            {
+                _pokerCombination.add(v);
+            }
+
+            foreach (k,v : pokerCopy)
+            {
+                var pokerCombination = new GameData::PokerCombination(GameData::DP,v._figure,[v]);
+                _pokerCombination.add(pokerCombination);   
+            }
+        }
+
+        function findPokerCombination(type,figure,size)
+        {
+            var res = null;
+            foreach (k,v : _pokerCombination)
+            {
+                if (v._type == type && v._figure > figure && (size == -1 || v._pokerArray.size() == size))
+                {
+                    res = v;
+                    var cnt = v._pokerArray.size();
+                    foreach (k1,v1 : _poker)
+                    {
+                        var isFind = false;
+                        foreach (k2,v2 : v._pokerArray)
+                        {
+                            isFind = v1 == v2;
+                            if (isFind)
+                            {
+                                break;                            
+                            }
+                        }
+
+                        if (!isFind)
+                        {
+                            continue;                        
+                        }
+
+                        foreach_del;
+                        cnt--;
+                        if (cnt <= 0)
+                        {
+                            break;                        
+                        }
+                    }
+                    
+                    foreach_del;
+                    break;
+                }            
+            }
+            return res;
+        }
+
+        virtual function run()
+        {
+            _pass = false;
+            //第一次出牌 或者 自己出了牌没人要的起
+            if (g_pokerGame._nowPokerCombinationPlayer == -1 || g_pokerGame._nowPokerCombinationPlayer == _index)
+            {
+                foreach (k,v : _findOrder)
+                {
+                    _nowPokerCombination = findPokerCombination(v,0,-1);
+                    if (_nowPokerCombination)
+                    {
+                        break;                    
+                    }
+                }
+
+                g_pokerGame._nowPokerCombination = _nowPokerCombination;
+                g_pokerGame._nowPokerCombinationPlayer = _index;
+                g_pokerGame.clearPass();
+
+                g_gameWin.playAction();
+                if (_nowPokerCombination._type == GameData::ZD)
+                {
+                    _zdCnt++;
+                }
+                return;
+            }
+
+            //该自己出牌了，锅里有别人打的牌
+            _nowPokerCombination = findPokerCombination(g_pokerGame._nowPokerCombination._type,
+            g_pokerGame._nowPokerCombination._figure,g_pokerGame._nowPokerCombination._pokerArray.size());
+            if (_nowPokerCombination != null)
+            {
+                g_pokerGame._nowPokerCombination = _nowPokerCombination;
+                g_pokerGame._nowPokerCombinationPlayer = _index;
+
+                g_gameWin.playAction();
+                return;                        
+            }
+
+            //如果没有和锅里牌类型一样时，判断是否出炸弹
+            if (g_pokerGame._nowPokerCombination._type == GameData::DP && _poker.size() > 10)
+            {
+                _pass = true;
+                g_gameWin.playAction();
+                return;            
+            }
+
+            var findFigure = 0;
+            if (g_pokerGame._nowPokerCombination._type == GameData::ZD)
+            {
+                findFigure = g_pokerGame._nowPokerCombination._figure;
+            }
+
+            _nowPokerCombination = findPokerCombination(GameData::ZD,findFigure,-1);
+            if (_nowPokerCombination != null)
+            {
+                g_pokerGame._nowPokerCombination = _nowPokerCombination;
+                g_pokerGame._nowPokerCombinationPlayer = _index;
+
+                g_gameWin.playAction();
+
+                if (_nowPokerCombination._type == GameData::ZD)
+                {
+                    _zdCnt++;
+                }            
+                return;                        
+            }
+
+            _pass = true;
+            g_gameWin.playAction();
+        }
+    }
+}

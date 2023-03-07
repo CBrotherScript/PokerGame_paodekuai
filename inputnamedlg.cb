@@ -1,0 +1,64 @@
+/**
+    输入名称对话框
+*/
+
+import lib/windows/BaseDialog
+
+class InputNameDlg extends BaseDialog
+{
+    var _nameEdit;
+
+    function InputNameDlg(parent)
+    {
+        super(parent);
+
+        var rect = parent.getWindowRect();
+        var width = rect.right - rect.left;
+        var height = rect.bottom - rect.top;
+        var bx = width / 2 - 130 + rect.left;
+        var by = (height - 110) / 2 + rect.top;
+
+        //createWindow("InputNameDlg",(WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME & ~WS_MAXIMIZEBOX) | WS_CLIPSIBLINGS | WS_POPUP,
+        createWindow("InputNameDlg", WS_POPUP | WS_BORDER | WS_CLIPSIBLINGS, 
+        bx,by,260,120,parent.m_hWnd);
+    }
+
+    virtual function onCreate()
+    {
+        this.createStaticText("请输入你的昵称:",0,10,130,30);
+        _nameEdit = this.createEditBox(60,43,135,28);
+
+        this.createButton("确定",78,80,100,30,GAME_BUTTON_SETNAME);
+    }    
+
+    function doModal()
+    {
+        var rect = m_parent.getWindowRect();
+        var width = rect.right - rect.left;
+        var height = rect.bottom - rect.top;
+        var bx = width / 2 - 130 + rect.left;
+        var by = (height - 110) / 2 + rect.top;       
+        setPosition(bx,by);
+
+        _nameEdit.setWindowText("");
+
+        super.doModal();
+    }
+
+    virtual function onCommand(cmdid)
+    {
+        switch (cmdid)
+        {
+            case GAME_BUTTON_SETNAME:
+            {
+                undoModal();
+                m_parent.startGame(_nameEdit.getWindowText());
+                break;
+            }
+            default:
+            {
+                break;
+            }
+        }
+    }       
+}

@@ -1,0 +1,23 @@
+/**
+    游戏全局定义
+*/
+
+const GAME_MENU_OPEN = 100;
+const GAME_MENU_RANK = 101;
+
+const GAME_BUTTON_SETNAME = 1000;
+const GAME_BUTTON_THROW =   2001;
+const GAME_BUTTON_PASS =    2002;
+const GAME_BUTTON_SCORE =   2003;
+const GAME_BUTTON_RANK =    2004;
+
+const GAME_INDEX_USER = 0;
+const GAME_INDEX_XIAOMING = 1;
+const GAME_INDEX_XIAOHONG = 2;
+
+const GAME_TIMER_START = 1;
+const GAME_TIMER_NEXT = 2;
+
+var g_gameWin = null;       //游戏窗口
+var g_pokerGame = null;     //游戏牌局数据和逻辑
+var g_user = null;          //玩家的player对象

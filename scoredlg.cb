@@ -1,0 +1,161 @@
+/**
+    分数结算窗口
+*/
+
+import lib/windows/BaseDialog
+
+class ScoreDlg extends BaseDialog
+{
+    var _parent;
+    var _memDC = null;
+    var _memDcBitmap = null;
+    var _backgroundBrush = CreateSolidBrush(RGB(15,198,105));
+    var _fontTitle = new Font(200,"楷体_GB2312");
+    var _fontValue = new Font(180,"楷体_GB2312");
+    var _playerArray = [null,null,null];
+    var _playerScore = [0,0,0];
+
+    var _firstPage = true;
+
+    function ScoreDlg(parent)
+    {
+        super(parent);
+
+        _parent = parent;
+        var rect = parent.getWindowRect();
+        var width = rect.right - rect.left;
+        var height = rect.bottom - rect.top;
+        var bx = width / 2 - 230 + rect.left;
+        var by = (height - 300) / 2 + rect.top;
+        openPaint();
+        createWindow("ScoreDlg", WS_POPUP | WS_BORDER | WS_CLIPSIBLINGS, 
+        bx,by,460,300,parent.m_hWnd);
+    }
+
+    virtual function onCreate()
+    {
+        this.createButton("确定",350,255,100,30,GAME_BUTTON_SCORE);
+    }    
+
+    function doModal()
+    {
+        _firstPage = true;
+        var rect = _parent.getWindowRect();
+        var seldRect = getWindowRect();
+        var bx = ((rect.right - rect.left) - (seldRect.right - seldRect.left)) / 2 + rect.left;
+        var by = ((rect.bottom - rect.top) - (seldRect.bottom - seldRect.top)) / 2 + rect.top;
+        setPosition(bx,by);
+
+        var idx = 1;
+        _playerArray[0] = g_pokerGame._player[g_pokerGame._winner];
+        foreach (k,v : g_pokerGame._player)
+        {
+            if (k == g_pokerGame._winner)
+            {
+                continue;
+            }
+            _playerArray[idx++] = v;
+        }
+
+        _playerScore[0] = _playerArray[0]._zdCnt * 100 + _playerArray[1]._zdCnt * -50 + _playerArray[2]._zdCnt * -50
+                            + _playerArray[1]._poker.size() * 10 + _playerArray[2]._poker.size() * 10;
+        _playerScore[1] = _playerArray[1]._zdCnt * 100 + _playerArray[0]._zdCnt * -50 + _playerArray[2]._zdCnt * -50
+                            + _playerArray[1]._poker.size() * -10;
+        _playerScore[2] = _playerArray[2]._zdCnt * 100 + _playerArray[0]._zdCnt * -50 + _playerArray[1]._zdCnt * -50
+                            + _playerArray[2]._poker.size() * -10;
+        super.doModal();
+    }
+
+    virtual function onPaint(dc)
+    {
+        if (_memDC == null)
+        {
+            _memDC = new CDC();
+            _memDC.createCompatibleDC(dc);
+
+            _memDcBitmap = new Bitmap();
+            _memDcBitmap.createCompatibleBitmap(dc,460,300);
+            _memDC.selectBitmap(_memDcBitmap);
+        }
+
+        var cdc = _memDC;
+
+        cdc.fillRect(0,0,460,300,_backgroundBrush);
+        cdc.setBkColor(RGB(15,198,105));
+
+        if (_firstPage)
+        {
+            cdc.selectFont(_fontTitle);            
+            cdc.setTextColor(RGB(231,51,77));
+            cdc.textOut(25,40,"姓名");
+            cdc.textOut(130,40,"炸弹数");
+            cdc.textOut(250,40,"剩牌数");
+            cdc.textOut(380,40,"得分");
+
+            cdc.selectFont(_fontValue);
+            cdc.setTextColor(RGB(0,0,0));
+
+            foreach (k,v : _playerArray)
+            {
+                cdc.textOut(20,100 + 50 * k,v._name);
+                cdc.textOut(155,100 + 50 * k,sprintf("%d个",v._zdCnt));
+                cdc.textOut(275,100 + 50 * k,sprintf("%d张",v._poker.size()));
+                cdc.textOut(385,100 + 50 * k,STRING(_playerScore[k]));
+            }
+        }
+        else
+        {
+            cdc.selectFont(_fontValue);
+            cdc.setTextColor(RGB(0,0,0));
+
+            foreach (k,v : _playerArray)
+            {
+                cdc.textOut(65,80 + 50 * k,v._name);
+                cdc.textOut(210,80 + 50 * k,sprintf("%d + %d = %d",v._score,_playerScore[k],v._score + _playerScore[k]));
+            }            
+
+            /*cdc.textOut(75,80,"小明");
+            cdc.textOut(75,130,"啊啊啊啊");
+            cdc.textOut(75,180,"asdfgdasf");
+
+            cdc.textOut(230,80,"500 + 280 = 780");
+            cdc.textOut(230,130,"500 - 160 = 340");
+            cdc.textOut(230,180,"500 - 10 = 380");*/
+        }
+       
+
+        dc.bitBlt(0,0,460,300,cdc,0,0,SRCCOPY);
+    }
+
+    virtual function onCommand(cmdid)
+    {
+        switch (cmdid)
+        {
+            case GAME_BUTTON_SCORE:
+            {
+                if (_firstPage)
+                {
+                    _firstPage = false;
+                    invalidate();
+                }
+                else
+                {
+                    undoModal();
+
+                    foreach (k,v : _playerArray)
+                    {
+                        v._score += _playerScore[k];
+                    }
+
+                    _parent.restartGame();
+                    //_parent.startGame(_nameEdit.getWindowText());
+                }
+                break;
+            }
+            default:
+            {
+                break;
+            }
+        }
+    }
+}

@@ -1,0 +1,82 @@
+/**
+    游戏资源管理
+*/
+
+import lib/windows/Image
+
+module GameRes
+{
+    var _back1Image = new Image();
+    var _back2Image = new Image();
+    var _cardImage = new Array();
+    var _cardWidth = 0;
+    var _cardHeight = 0;
+    var _cardBack = new Image();
+    var _rankBack = new Image();
+
+    function loadResource()
+    {
+        var path = GetRoot();
+        _back1Image.Load(path + "res\\back1.bmp");
+        _back2Image.Load(path + "res\\back2.bmp");
+        
+        for (var i = 4; i <= 13 ; i++)
+        {
+            var image = new Image();            
+            image.Load(path + sprintf("res\\HT%d.bmp",i));
+            _cardImage.add(image);
+        }
+        for (var i = 1; i < 4 ; i++)
+        {
+            var image = new Image();            
+            image.Load(path + sprintf("res\\HT%d.bmp",i));
+            _cardImage.add(image);
+        }
+
+        for (var i = 4; i <= 13 ; i++)
+        {
+            var image = new Image();            
+            image.Load(path + sprintf("res\\HTT%d.bmp",i));
+            _cardImage.add(image);
+        }
+        for (var i = 1; i < 4 ; i++)
+        {
+            var image = new Image();            
+            image.Load(path + sprintf("res\\HTT%d.bmp",i));
+            _cardImage.add(image);
+        }        
+        
+        for (var i = 4; i <= 13 ; i++)
+        {
+            var image = new Image();            
+            image.Load(path + sprintf("res\\MH%d.bmp",i));
+            _cardImage.add(image);
+        }
+        for (var i = 1; i < 4 ; i++)
+        {
+            var image = new Image();            
+            image.Load(path + sprintf("res\\MH%d.bmp",i));
+            _cardImage.add(image);
+        }
+
+        for (var i = 4; i <= 13 ; i++)
+        {
+            var image = new Image();            
+            image.Load(path + sprintf("res\\FP%d.bmp",i));
+            _cardImage.add(image);
+        }
+        for (var i = 1; i < 4 ; i++)
+        {
+            var image = new Image();            
+            image.Load(path + sprintf("res\\FP%d.bmp",i));
+            _cardImage.add(image);
+        }
+
+        _cardBack.Load(path + "res\\BACK.BMP");
+
+        _cardWidth = image.m_Width;
+        _cardHeight = image.m_Height;
+
+        _rankBack.Load(path + "res\\rank.bmp");
+    }
+}

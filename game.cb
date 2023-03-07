@@ -1,0 +1,415 @@
+/**
+    游戏主窗口
+*/
+
+import lib/windows/CustomWindow
+import lib/windows/Image
+import lib/windows/Bitmap
+
+import define
+import inputnamedlg
+import resource
+import userplayer
+import computerplayer
+import gamedata
+import scoredlg
+import rankdlg
+
+class GameWin extends CustomWindow
+{
+    var _menu = null;
+    var _inputNameDlg = null;
+    var _scoreDlg = null;
+    var _rankDlg = null;
+    var _font = new Font(200,"华文行楷");
+
+    var _startGame = false;     //开始游戏标记
+    var _runingAction = false;  //运行动画标记，动画运行种不允许用户操作
+
+    var _buttonThrowPoker = null;
+    var _buttonPass = null;
+
+    var _memDC = null;
+    var _memDcBitmap = null;
+
+    function GameWin(params)
+    {
+        super("gamewin");
+        var menuHeight = GetSystemMetrics(SM_CYMENU);
+        var captionHeight = GetSystemMetrics(SM_CYCAPTION);
+        var border = GetSystemMetrics(SM_CYFIXEDFRAME) * 2;
+
+        setBackground(COLOR_WINDOW);
+        openPaint();
+        createWindow("gamewin",(WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME & ~WS_MAXIMIZEBOX) | WS_CLIPSIBLINGS | WS_POPUP,
+            100,100,915 + border,630 + menuHeight + captionHeight + border,null);
+
+        _inputNameDlg = new InputNameDlg(this);
+        _scoreDlg = new ScoreDlg(this);
+        _rankDlg = new RankDlg(this);
+        g_gameWin = this;
+    }
+
+    function onCreate()
+    {
+        //print "onCreate";        
+
+        //创建菜单
+        var menuInfo = [{str_convert("游戏菜单","utf-8","gbk"):[{str_convert("开始","utf-8","gbk"):GAME_MENU_OPEN},{str_convert("排行榜","utf-8","gbk"):GAME_MENU_RANK}]}];        
+        _menu = this.createMenu(menuInfo);
+
+        _buttonThrowPoker = this.createButton("出牌",332,385,100,30,GAME_BUTTON_THROW);
+        _buttonPass = this.createButton("不出",482,385,100,30,GAME_BUTTON_PASS);
+        _buttonThrowPoker.hide();
+        _buttonPass.hide();
+
+        //加载游戏资源
+        GameRes::loadResource();
+    }
+
+    virtual function onPaint(dc)
+    {
+        if (_memDC == null)
+        {
+            _memDC = new CDC();
+            _memDC.createCompatibleDC(dc);
+
+            _memDcBitmap = new Bitmap();
+            _memDcBitmap.createCompatibleBitmap(dc,GameRes::_back2Image.m_Width,GameRes::_back2Image.m_Height);
+            _memDC.selectBitmap(_memDcBitmap);
+        }
+
+        var cdc = _memDC;
+
+        if (!_startGame)
+        {
+            GameRes::_back1Image.show(cdc,0,0,GameRes::_back1Image.m_Width,GameRes::_back1Image.m_Height);
+        }
+        else
+        {
+            GameRes::_back2Image.show(cdc,0,0,GameRes::_back2Image.m_Width,GameRes::_back2Image.m_Height);
+
+            for (var i = 0; i < g_pokerGame._player[GAME_INDEX_XIAOMING]._poker.size() ; i++)
+            {
+                var xpos = 150;
+                var ypos = 70 + i * 15;
+                if (g_pokerGame._winner == -1)
+                {
+                    GameRes::_cardBack.show(cdc,xpos,ypos,xpos + GameRes::_cardWidth,ypos + GameRes::_cardHeight);
+                }
+                else
+                {
+                    g_pokerGame._player[GAME_INDEX_XIAOMING]._poker[i]._bmp.show(
+                        cdc,xpos,ypos,xpos + GameRes::_cardWidth,ypos + GameRes::_cardHeight);
+                }
+            }
+
+            if (g_pokerGame._player[GAME_INDEX_XIAOMING]._nowPokerCombination)
+            {
+                foreach (k,v : g_pokerGame._player[GAME_INDEX_XIAOMING]._nowPokerCombination._pokerArray)
+                {
+                    var xpos = 250;
+                    var ypos = 70 + k * 15;
+                    v._bmp.show(cdc,xpos,ypos,xpos + GameRes::_cardWidth,ypos + GameRes::_cardHeight);                    
+                }                
+            }
+            else if(g_pokerGame._player[GAME_INDEX_XIAOMING]._pass)
+            {
+                cdc.textOut(250,70,"不出");
+            }
+
+            for (var i = 0; i < g_pokerGame._player[GAME_INDEX_XIAOHONG]._poker.size() ; i++)
+            {
+                var xpos = GameRes::_back2Image.m_Width - 150 - GameRes::_cardWidth;
+                var ypos = 70 + i * 15;
+                if (g_pokerGame._winner == -1)
+                {
+                    GameRes::_cardBack.show(cdc,xpos,ypos,xpos + GameRes::_cardWidth,ypos + GameRes::_cardHeight);                    
+                }
+                else
+                {
+                    g_pokerGame._player[GAME_INDEX_XIAOHONG]._poker[i]._bmp.show(
+                        cdc,xpos,ypos,xpos + GameRes::_cardWidth,ypos + GameRes::_cardHeight);
+                }
+            }
+
+            if (g_pokerGame._player[GAME_INDEX_XIAOHONG]._nowPokerCombination)
+            {
+                foreach (k,v : g_pokerGame._player[GAME_INDEX_XIAOHONG]._nowPokerCombination._pokerArray)
+                {
+                    var xpos = GameRes::_back2Image.m_Width - 250 - GameRes::_cardWidth;
+                    var ypos = 70 + k * 15;
+                    v._bmp.show(cdc,xpos,ypos,xpos + GameRes::_cardWidth,ypos + GameRes::_cardHeight);
+                }
+            }
+            else if(g_pokerGame._player[GAME_INDEX_XIAOHONG]._pass)
+            {
+                cdc.textOut(GameRes::_back2Image.m_Width - 250 - GameRes::_cardWidth,70,"不出");
+            }
+
+            if (g_user._pass)
+            {
+                cdc.textOut(400,380,"不出");
+            }
+
+            if (g_user._nowPokerCombination)
+            {
+                foreach (k,v : g_user._nowPokerCombination._pokerArray)
+                {
+                    var xpos = 350 + k * 18;
+                    var ypos = 300;
+                    v._bmp.show(cdc,xpos,ypos,xpos + GameRes::_cardWidth,ypos + GameRes::_cardHeight);
+                }
+            }            
+
+            for (var i = 0; i < g_user._poker.size() ; i++)
+            {
+                var xpos = 265 + i * 18;
+                var ypos = 450;
+                if (g_user._selectFlag[i])
+                {                    
+                    ypos -= 30;                    
+                }
+                g_user._poker[i]._bmp.show(cdc,xpos,ypos,xpos + GameRes::_cardWidth,ypos + GameRes::_cardHeight);
+            }
+
+            cdc.selectFont(_font);
+            cdc.setBkColor(RGB(15,198,105));
+            cdc.textOut(340,560,g_pokerGame._player[0]._name);
+            cdc.textOut(340,590,STRING(g_pokerGame._player[0]._score));
+            cdc.textOut(50,50,g_pokerGame._player[1]._name);
+            cdc.textOut(50,80,STRING(g_pokerGame._player[1]._score));
+            cdc.textOut(815,50,g_pokerGame._player[2]._name);
+            cdc.textOut(815,80,STRING(g_pokerGame._player[2]._score));
+        }
+
+        dc.bitBlt(0,0,GameRes::_back2Image.m_Width,GameRes::_back2Image.m_Height,cdc,0,0,SRCCOPY);
+    }
+
+    function onCommand(cmdid)
+    {
+        switch (cmdid)
+        {
+            case GAME_MENU_OPEN:
+            {
+                if (!_startGame)
+                {
+                    _inputNameDlg.doModal();
+                }
+                break;
+            }
+            case GAME_MENU_RANK:
+            {
+                _rankDlg.doModal();
+                break;
+            }
+            case GAME_BUTTON_THROW:
+            {
+                if(!g_user.throwPocker())
+                {
+                    messageBox("不能这么出牌!!");
+                }
+                else
+                {
+                    hideUserButton();
+                }
+                break;
+            }
+            case GAME_BUTTON_PASS:
+            {
+                g_user.pass();
+                hideUserButton();
+                break;
+            }
+            default:
+            {
+                break;
+            }
+        }
+
+        //print "cmdid:" + cmdid;
+    }
+
+    virtual function onMessage(message,wParam,lParam)
+    {
+        switch (message)
+        {
+            case WM_LBUTTONDOWN:
+            {
+                onLButtonDown(moustPoint(lParam));
+                break;
+            }
+            case WM_RBUTTONDOWN:
+            {
+                g_user.cancelSlect();
+                invalidate();
+                break;
+            }
+            case WM_ERASEBKGND:
+            {
+                return true;
+            }
+            default:
+            {
+                break;
+            }
+        }
+    }    
+
+    function restartGame()
+    {
+        _runingAction = false;        
+        _runingAction = true;
+        killTimer(GAME_TIMER_NEXT);
+        killTimer(GAME_TIMER_START);
+        hideUserButton();
+
+        var idx = g_pokerGame.checkGameOver();
+        if (idx != -1)
+        {
+            if (idx == g_user._index)
+            {
+                messageBox("你被踢死了");
+            }
+            else
+            {
+                messageBox(sprintf("%s被踢死了",g_pokerGame._player[idx]._name));
+            }
+
+            if (_rankDlg.refRank())
+            {
+                _rankDlg.doModal();                                
+            }
+
+            _startGame = false;
+            invalidate();
+            return;
+        }
+
+        g_pokerGame.resetPlayerPoker();
+        setTimer(GAME_TIMER_START,1000);
+    }
+
+    function startGame(name)
+    {
+        if (strlen(name) > 0)
+        {
+            var playerName = name;
+        }
+        else
+        {
+            var playerName = "无名";
+        }
+        _startGame = true;
+        g_user = new GameData::UserPlayer(playerName,GAME_INDEX_USER);
+        var xiaoming = new GameData::ComputerPlayer("小明",GAME_INDEX_XIAOMING);
+        var xiaohong = new GameData::ComputerPlayer("小红",GAME_INDEX_XIAOHONG);
+        g_pokerGame = new GameData::PokerGame(g_user,xiaoming,xiaohong);
+        restartGame();
+        invalidate();
+    }
+
+    function gameRun()
+    {
+        var winner = g_pokerGame.checkOver();
+        if (winner != -1)
+        {
+            if (winner == GAME_INDEX_USER)
+            {
+                messageBox("你赢了!!");
+            }
+            else if (winner == GAME_INDEX_XIAOMING)
+            {
+                messageBox("小明获胜!!");
+            }
+            else if (winner == GAME_INDEX_XIAOHONG)
+            {
+                messageBox("小红获胜!!");
+            }
+            _scoreDlg.doModal();
+            invalidate();
+            return;            
+        }
+
+        if (g_pokerGame._nowPokerCombinationPlayer == g_pokerGame._nextPlayer)
+        {
+            foreach (k,v : g_pokerGame._player)
+            {
+                v.clearThrowPoker();
+            }
+        }
+        
+        g_pokerGame.runing();
+        g_pokerGame._player[g_pokerGame._nextPlayer]._pass = false;
+    }
+
+    function showUserButton()
+    {
+        _buttonThrowPoker.show();
+        if (g_pokerGame._nowPokerCombinationPlayer != -1 && 
+            g_pokerGame._nowPokerCombinationPlayer != g_user._index)
+        {
+            _buttonPass.show();
+        }
+        
+        invalidate();
+    }
+
+    function hideUserButton()
+    {
+        _buttonThrowPoker.hide();
+        _buttonPass.hide();
+    }
+
+    function playAction()
+    {
+        setTimer(GAME_TIMER_NEXT,1000);
+        //g_pokerGame.clearNextPass();
+        invalidate();
+    }
+
+    function onTimer(nIDEvent)
+    {
+        if (nIDEvent == GAME_TIMER_START)
+        {
+            killTimer(GAME_TIMER_START);
+            gameRun();
+        }
+        else if (nIDEvent == GAME_TIMER_NEXT)
+        {
+            killTimer(GAME_TIMER_NEXT);
+            gameRun();
+        }
+    }
+
+    function onLButtonDown(point)
+    {
+        if (point.y >= 450 &&  point.y < GameRes::_cardHeight + 450 &&
+        point.x >= 265 && point.x < 265 + (g_user._poker.size() - 1) * 18 + GameRes::_cardWidth)
+        {
+            var idx = INT((point.x - 265) / 18);
+            if (idx >= g_user._poker.size() - 1)
+            {
+                idx = g_user._poker.size() - 1;
+            }
+
+            g_user.selectPoker(idx);
+            invalidate();
+        }
+    }
+}
+
+function main()
+{
+    /*if (INT(strreplace(CBrotherVersion(),".","")) < 254)
+    {
+        throw ("Exception","the game requires cbrother version > 2.5.4,please download the latest version of cbrother.");
+    }*/
+
+    var consolWin = GetConsoleWindow();
+    ShowWindow(consolWin,SW_HIDE);
+    var win = new GameWin();
+    win.run();
+    
+    ShowWindow(consolWin,SW_SHOW);
+}

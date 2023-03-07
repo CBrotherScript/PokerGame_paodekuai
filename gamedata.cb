@@ -1,0 +1,271 @@
+/**
+    游戏数据与逻辑定义
+*/
+
+module GameData
+{
+    const SPADE = 1;        //黑桃
+    const HEART = 2;        //红桃
+    const CLUB = 3;         //梅花
+    const DOAMOND = 4;      //方块
+
+    const DP = 1;           //单牌  A
+    const DZ = 2;           //对子  AA
+    const SD = 3;           //三带  AAABC
+    const ZD = 4;           //炸弹  AAAA
+    const SZ = 5;           //顺子  ABCDE
+    const ZMD = 6;          //姊妹对 AABBBCC
+    const SMD = 7;          //三姊妹对 AAABBB
+
+    //扑克牌定义
+    class Poker
+    {
+        var _figure;        //牌的点数
+        var _pattern;       //牌的花色
+        var _bmp;           //对应的图片
+    }
+
+    //扑克牌类型组合定义
+    class PokerCombination
+    {
+        function PokerCombination(t,f,pokerArr)
+        {
+            _type = t;
+            _figure = f;
+            _pokerArray = pokerArr;            
+        }
+
+        var _type;          //组合的类型
+        var _figure;        //组合的点数
+        var _pokerArray;    //组合包含的扑克牌
+    }
+
+    //牌桌上角色的基类
+    class Player
+    {
+        var _name;                  //姓名
+        var _index;                 //编号
+        var _poker = new Array();   //手里的牌
+        var _score = 500;           //分数
+        var _haveHeart4 = false;    //是否有红桃4,红桃4先出牌
+        var _nowPokerCombination;   //当前自己出的牌
+        var _pass = false;          //当前是否显示pass
+        var _zdCnt = 0;             //牌局中打出的炸弹数量
+
+        function Player(name,idx)
+        {
+            _name = name;
+            _index = idx;
+        }
+
+        //开始一局前，清理动作
+        virtual function clear()
+        {
+            _poker.clear();
+            _haveHeart4 = false;
+            _nowPokerCombination = null;
+            _pass = false;
+            _zdCnt = 0;
+            _haveHeart4 = 0;
+        }
+
+        //将手里的牌排序
+        virtual function sort()
+        {
+            for (var i = 0; i < _poker.size() - 1 ; i++)
+            {
+                var selIdx = i;
+                var minPoker = _poker[i];
+                for (var j = i + 1; j < _poker.size() ; j++)
+                {
+                    var comparePoker = _poker[j];
+                    //按点数由4->K->A排序，按花色方、梅、红、黑排
+                    if (minPoker._figure > comparePoker._figure || 
+                    minPoker._figure == comparePoker._figure && minPoker._pattern > comparePoker._pattern)
+                    {
+                        minPoker = comparePoker;
+                        selIdx = j;
+                    }
+                }
+
+                if (selIdx != i)
+                {
+                    _poker[selIdx] = _poker[i];
+                    _poker[i] = minPoker;
+                }
+            }
+
+            findHeart4();
+        }
+
+        function findHeart4()
+        {
+            foreach (k,v : _poker)
+            {
+                if (v._pattern == HEART && v._figure == 4)
+                {
+                    _haveHeart4 = true;
+                    return;
+                }                
+            }            
+        }
+
+        virtual function run();
+
+        //清除打出的牌状态
+        function clearThrowPoker()
+        {
+            _pass = false;
+            _nowPokerCombination = null;                        
+        }
+    }
+
+    //游戏牌局类
+    class PokerGame
+    {
+        var _player = new Array();              //牌局种的三个人
+        var _allPokers = new Array();           //所有牌，51张 这个玩法没有方片3
+        var _nextPlayer = -1;                   //下一个出牌的玩家索引
+        var _nowPokerCombination = null;        //当前锅里牌的类型
+        var _nowPokerCombinationPlayer = -1;    //当前锅里牌谁打的
+        var _winner = -1;                       //赢家编号
+
+        function PokerGame(p1,p2,p3)
+        {
+            _player.add(p1);
+            _player.add(p2);
+            _player.add(p3);            
+
+            _allPokers.resize(51);
+            for (var i = 0; i < 13 ; i++)
+            {
+                _allPokers[i] = new Poker();
+                _allPokers[i]._figure = i + 4;
+                _allPokers[i]._pattern = SPADE;
+                _allPokers[i]._bmp = GameRes::_cardImage[i];
+
+                _allPokers[i + 13] = new Poker();
+                _allPokers[i + 13]._figure = i + 4;
+                _allPokers[i + 13]._pattern = HEART;
+                _allPokers[i + 13]._bmp = GameRes::_cardImage[i + 13];
+
+                _allPokers[i + 26] = new Poker();
+                _allPokers[i + 26]._figure = i + 4;
+                _allPokers[i + 26]._pattern = CLUB;
+                _allPokers[i + 26]._bmp = GameRes::_cardImage[i + 26];
+
+                if (i == 12)        //不添加方片3
+                {
+                    continue;
+                }
+
+                _allPokers[i + 39] = new Poker();
+                _allPokers[i + 39]._figure = i + 4;
+                _allPokers[i + 39]._pattern = DOAMOND;
+                _allPokers[i + 39]._bmp = GameRes::_cardImage[i + 39];
+            }
+        }
+
+        //洗牌
+        function resetPlayerPoker()
+        {
+            _nowPokerCombination = null;
+            _nowPokerCombinationPlayer = -1;
+            _winner = -1;
+            _nextPlayer = -1;
+            foreach (k,v : _player)
+            {
+                v.clear();
+            }
+            
+            var randVec = new Array();
+            for (var i = 0; i < 51 ; i++)
+            {
+                randVec.add(i);
+            }
+
+            var pokerIndex = new Array();
+            for (var i = 0; i < 51 ; i++)
+            {
+                var r = math::rand(0,randVec.size());                
+                var idx = randVec.remove(r);        
+                pokerIndex.add(idx);
+            }
+            
+            //var jsonstr = "[17,1,23,19,15,24,9,20,34,35,43,2,12,4,29,50,14,37,30,36,46,47,40,6,28,25,16,48,21,13,3,49,10,33,22,44,18,26,41,45,32,8,0,38,5,42,27,39,31,11,7]";
+            //var pokerIndex = json::parseJsonString(jsonstr);
+            print json::toJsonString(pokerIndex);
+            for (var i = 0; i < 51 ; i += 3)
+            {
+                _player[0]._poker.add(_allPokers[pokerIndex[i]]);
+                _player[1]._poker.add(_allPokers[pokerIndex[i + 1]]);                
+                _player[2]._poker.add(_allPokers[pokerIndex[i + 2]]);
+            }
+
+            foreach (k,v : _player)
+            {
+                v.sort();
+                if (v._haveHeart4)
+                {
+                    _nextPlayer = k;                    
+                }
+            }
+        }
+
+        function checkOver()
+        {
+            foreach (k,v : _player)
+            {
+                if (v._poker.size() <= 0)
+                {
+                    _winner = k;
+                    return k;
+                }                
+            }
+
+            return -1;
+        }
+
+        function checkGameOver()
+        {
+            foreach (k,v : _player)
+            {
+                if (v._score <= 0)
+                {                    
+                    return k;
+                }
+            }
+
+            return -1;
+        }
+
+        function runing()
+        {
+            _player[_nextPlayer].run();
+            _nextPlayer--;
+            if (_nextPlayer < 0)
+            {
+                _nextPlayer = 2;
+            }
+        }
+
+        function clearNextPass()
+        {
+            var nextIdx = _nextPlayer - 1;
+            if (nextIdx < 0)
+            {
+                nextIdx = 2;
+            }
+
+            _player[_nextPlayer]._pass = false;
+        }
+
+        function clearPass()
+        {
+            foreach (k,v : _player)
+            {
+                v._pass = false;
+            }        
+        }        
+    }
+}

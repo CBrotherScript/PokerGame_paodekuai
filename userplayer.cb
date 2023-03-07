@@ -1,0 +1,324 @@
+/**
+    玩家控制的角色类型定义
+ */
+
+import gamedata
+
+module GameData
+{
+    class UserPlayer extends GameData::Player
+    {
+        var _selectFlag = new Array();
+        var _selectPoker = new Array();
+
+        function UserPlayer(name,idx)
+        {
+            super(name,idx);
+            _selectFlag.resize(17,0);
+        }
+
+        //开始一局前，清理动作
+        virtual function clear()
+        {
+            super.clear();
+
+            _selectFlag.clear();
+            _selectFlag.resize(17,0);
+        }    
+
+        virtual function run()
+        {
+            _nowPokerCombination = null;
+            _pass = false;
+            g_gameWin.showUserButton();
+        }
+
+        function selectPoker(idx)
+        {
+            _selectFlag[idx] = INT(!_selectFlag[idx]);
+        }
+
+        function cancelSlect()
+        {
+            for (var i = 0; i < _selectFlag.size() ; i++)
+            {
+                _selectFlag[i] = 0;
+            }
+        }
+
+        function createPokerCombination(figure,type)
+        {
+            _nowPokerCombination = new GameData::PokerCombination(type,figure,_selectPoker);
+            g_pokerGame._nowPokerCombination = _nowPokerCombination;
+            g_pokerGame._nowPokerCombinationPlayer = _index;
+            foreach_reverse (k,v : _selectFlag)
+            {
+                if (v)
+                {
+                    _poker.remove(k);    
+                }
+            }
+            cancelSlect();
+
+            g_gameWin.playAction();        
+        }
+
+        function throwPocker()
+        {
+            _selectPoker.clear();
+            foreach (k,v : _selectFlag)
+            {
+                if (v)
+                {
+                    _selectPoker.add(_poker[k]);
+                }
+            }
+
+            if (_selectPoker.size() <= 0)
+            {
+                return false;            
+            }
+
+            var isFirst = g_pokerGame._nowPokerCombinationPlayer == -1 || g_pokerGame._nowPokerCombinationPlayer == _index;
+            var nowfigure = 0;
+            if (!isFirst && g_pokerGame._nowPokerCombination)
+            {
+                nowfigure = g_pokerGame._nowPokerCombination._figure;
+            }
+
+            //单牌判断
+            if (_selectPoker.size() == 1)
+            {
+                //锅里不是对子
+                if (!isFirst && g_pokerGame._nowPokerCombination._type != GameData::DP)
+                {
+                    return false;                
+                }
+
+                //点数小于锅里的牌
+                if (_selectPoker[0]._figure <= nowfigure)
+                {
+                    return false;
+                }
+
+                createPokerCombination(_selectPoker[0]._figure,GameData::DP);
+                return true;
+            }        
+
+            //对子判断
+            if (_selectPoker.size() == 2)
+            {
+                //锅里不是对子
+                if (!isFirst && g_pokerGame._nowPokerCombination._type != GameData::DZ)
+                {
+                    return false;                
+                }
+
+                //选择的不是对子或者点数小于锅里的牌
+                if (_selectPoker[0]._figure != _selectPoker[1]._figure || _selectPoker[0]._figure <= nowfigure)
+                {
+                    return false;
+                }
+
+                createPokerCombination(_selectPoker[0]._figure,GameData::DZ);
+                return true;
+            }
+
+            //炸弹判断
+            if (_selectPoker.size() == 4)
+            {
+                //选择的不是对子或者点数小于锅里的牌
+                if (_selectPoker[0]._figure != _selectPoker[1]._figure || 
+                    _selectPoker[0]._figure != _selectPoker[2]._figure || 
+                    _selectPoker[0]._figure != _selectPoker[3]._figure || 
+                    (g_pokerGame._nowPokerCombination._type == GameData::ZD && _selectPoker[0]._figure <= nowfigure))
+                {
+                    return false;
+                }
+
+                createPokerCombination(_selectPoker[0]._figure,GameData::ZD);
+                _zdCnt++;
+                return true;
+            }
+
+            if (!isFirst && _selectPoker.size() != g_pokerGame._nowPokerCombination._pokerArray.size())
+            {
+                return false;            
+            }
+
+            //三带类型或者顺子
+            if (_selectPoker.size() == 5)
+            {
+                var sameCnt = 1;
+                var sameFigure = _selectPoker[0]._figure;
+                for (var i = 1; i < _selectPoker.size() && sameCnt < 3 ; i++)
+                {
+                    if (_selectPoker[i]._figure != sameFigure)
+                    {
+                        sameCnt = 1;
+                        sameFigure = _selectPoker[i]._figure;
+                    }
+                    else
+                    {
+                        sameCnt++;
+                    }
+                }
+
+                if (sameCnt == 3)
+                {
+                    //锅里不是三代
+                    if (!isFirst && g_pokerGame._nowPokerCombination._type != GameData::SD)
+                    {
+                        return false;                
+                    }
+
+                    //点数小于锅里的牌
+                    if (sameFigure <= nowfigure)
+                    {
+                        return false;
+                    }
+
+                    var isChange = false;
+                    for (var i = 2; i >= 0 ; i--)
+                    {
+                        if (_selectPoker[i]._figure != sameFigure)
+                        {
+                            _selectPoker.add(_selectPoker[i]);
+                            _selectPoker.remove(i);
+                            isChange = true;
+                        }
+                    }
+
+                    if (isChange)
+                    {
+                        var temp = _selectPoker[3];
+                        _selectPoker[3] = _selectPoker[4];
+                        _selectPoker[4] = temp;
+                    }                
+
+                    createPokerCombination(sameFigure,GameData::SD);
+                    return true;           
+                }
+            }
+
+            if (_selectPoker.size() < 5)
+            {
+                return false;                        
+            }
+
+            //顺子判断
+            var lastFigure = _selectPoker[0]._figure;
+            for (var i = 1; i < _selectPoker.size() ; i++)
+            {
+                if (_selectPoker[i]._figure != lastFigure + 1)
+                {
+                    lastFigure = -1;
+                    break;                
+                }
+
+                lastFigure++;
+            }
+
+            if (lastFigure != -1)
+            {
+                //锅里不是顺子
+                if (!isFirst && g_pokerGame._nowPokerCombination._type != GameData::SZ)
+                {
+                    return false;                
+                }
+
+                //点数小于锅里的牌
+                if (_selectPoker[0]._figure <= nowfigure)
+                {
+                    return false;
+                }
+
+                createPokerCombination(_selectPoker[0]._figure,GameData::SZ);
+                return true;
+            }
+
+            //偶数张牌才有可能是姊妹对或三妹对
+            if (_selectPoker.size() % 2 == 0)
+            {
+                //姊妹对判断
+                lastFigure = _selectPoker[0]._figure;
+                for (var i = 0; i < _selectPoker.size() - 1 ; i += 2)
+                {
+                    if (_selectPoker[i]._figure != lastFigure || _selectPoker[i + 1]._figure != lastFigure)
+                    {
+                        lastFigure = -1;
+                        break;                
+                    }
+
+                    lastFigure++;
+                }
+
+                if (lastFigure != -1)
+                {
+                    //锅里不是姊妹对
+                    if (!isFirst && g_pokerGame._nowPokerCombination._type != GameData::ZMD)
+                    {
+                        return false;                
+                    }
+
+                    //点数小于锅里的牌
+                    if (_selectPoker[0]._figure <= nowfigure)
+                    {
+                        return false;
+                    }
+
+                    createPokerCombination(_selectPoker[0]._figure,GameData::ZMD);
+                    return true;
+                }
+            }
+
+            if (_selectPoker.size() % 3 != 0)
+            {
+                return false;            
+            }
+
+            //三妹对判断
+            lastFigure = _selectPoker[0]._figure;
+            for (var i = 0; i < _selectPoker.size() - 2 ; i += 3)
+            {
+                if (_selectPoker[i]._figure != lastFigure || _selectPoker[i + 1]._figure != lastFigure 
+                    || _selectPoker[i + 2]._figure != lastFigure)
+                {
+                    lastFigure = -1;
+                    break;                
+                }
+
+                lastFigure++;
+            }
+
+            if (lastFigure != -1)
+            {
+                //锅里不是三妹对
+                if (!isFirst && g_pokerGame._nowPokerCombination._type != GameData::SMD)
+                {
+                    return false;                
+                }
+
+                //点数小于锅里的牌
+                if (_selectPoker[0]._figure <= nowfigure)
+                {
+                    return false;
+                }
+
+                createPokerCombination(_selectPoker[0]._figure,GameData::SMD);
+                return true;
+            }        
+
+            return false;
+        }
+
+        function pass()
+        {
+            _pass = true;
+            _nowPokerCombination = null;
+            g_gameWin.playAction();
+            cancelSlect();
+        }
+    }
+
+}
