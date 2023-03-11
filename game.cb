@@ -24,7 +24,6 @@ class GameWin extends CustomWindow
     var _font = new Font(200,"华文行楷");
 
     var _startGame = false;     //开始游戏标记
-    var _runingAction = false;  //运行动画标记，动画运行种不允许用户操作
 
     var _buttonThrowPoker = null;
     var _buttonPass = null;
@@ -258,8 +257,6 @@ class GameWin extends CustomWindow
 
     function restartGame()
     {
-        _runingAction = false;        
-        _runingAction = true;
         killTimer(GAME_TIMER_NEXT);
         killTimer(GAME_TIMER_START);
         hideUserButton();
